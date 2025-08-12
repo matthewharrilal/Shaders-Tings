@@ -312,6 +312,44 @@
             border-color: #00ff88;
         }
 
+        /* Visualization Toggle Button */
+        #visualization-toggle-btn {
+            position: fixed;
+            bottom: 80px;
+            right: 20px;
+            background: rgba(255, 100, 100, 0.2);
+            border: 2px solid #ff6464;
+            color: #ff6464;
+            padding: 10px 15px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 14px;
+            z-index: 1000;
+            transition: all 0.3s ease;
+            backdrop-filter: blur(5px);
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            min-width: 160px;
+            justify-content: center;
+        }
+
+        #visualization-toggle-btn:hover {
+            background: rgba(255, 100, 100, 0.4);
+            transform: scale(1.05);
+            box-shadow: 0 4px 15px rgba(255, 100, 100, 0.3);
+        }
+
+        #toggle-icon {
+            font-size: 16px;
+        }
+
+        #toggle-text {
+            font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
+            font-size: 12px;
+            font-weight: bold;
+        }
+
         @media (max-width: 768px) {
             #control-panel {
                 width: calc(100vw - 40px);
@@ -541,8 +579,47 @@ for (i=0; i&lt;19; i++) {
     </div>
 
     <div id="fullscreen-btn" onclick="toggleFullscreen()">⛶</div>
+    
+    <!-- Visualization Toggle Button -->
+    <div id="visualization-toggle-btn" onclick="toggleVisualization()">
+        <span id="toggle-icon">🧠</span>
+        <span id="toggle-text">Neural Network</span>
+    </div>
 
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
     <script type="module" src="./main.js"></script>
+    
+    <script>
+        // Visualization toggle functionality
+        function toggleVisualization() {
+            const currentUrl = window.location.pathname;
+            
+            if (currentUrl.includes('decentralized-network-topology.html') || currentUrl.endsWith('decentralized-network-topology.html')) {
+                // Switch to cosmic shader
+                window.location.href = 'index.html';
+            } else {
+                // Switch to neural network
+                window.location.href = 'decentralized-network-topology.html';
+            }
+        }
+        
+        // Update button text based on current page
+        function updateToggleButton() {
+            const currentUrl = window.location.pathname;
+            const toggleIcon = document.getElementById('toggle-icon');
+            const toggleText = document.getElementById('toggle-text');
+            
+            if (currentUrl.includes('decentralized-network-topology.html') || currentUrl.endsWith('decentralized-network-topology.html')) {
+                toggleIcon.textContent = '🌌';
+                toggleText.textContent = 'Cosmic Shader';
+            } else {
+                toggleIcon.textContent = '🧠';
+                toggleText.textContent = 'Neural Network';
+            }
+        }
+        
+        // Initialize button on page load
+        document.addEventListener('DOMContentLoaded', updateToggleButton);
+    </script>
 </body>
 </html>

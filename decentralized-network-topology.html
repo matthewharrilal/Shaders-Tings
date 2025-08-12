@@ -1,0 +1,1527 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Neural Network - Synaptic Electrical Firing Visualization</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            background: #0a0a0f;
+            color: #ffffff;
+            font-family: 'Courier New', monospace;
+            overflow: hidden;
+            height: 100vh;
+        }
+
+        #container {
+            position: relative;
+            width: 100vw;
+            height: 100vh;
+        }
+
+        #canvas-container {
+            width: 100%;
+            height: 100%;
+        }
+
+        /* UI Controls */
+        #ui-panel {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            background: rgba(0, 20, 40, 0.9);
+            border: 1px solid #00ffaa;
+            border-radius: 8px;
+            padding: 20px;
+            max-width: 300px;
+            backdrop-filter: blur(10px);
+            z-index: 100;
+            transition: transform 0.3s ease;
+        }
+
+        #ui-panel.minimized {
+            transform: translateX(-85%);
+        }
+
+        .panel-header {
+            color: #00ffaa;
+            font-size: 14px;
+            font-weight: bold;
+            margin-bottom: 15px;
+            border-bottom: 1px solid #00ffaa;
+            padding-bottom: 5px;
+        }
+
+        .control-group {
+            margin-bottom: 15px;
+        }
+
+        .control-group label {
+            display: block;
+            color: #88ccff;
+            font-size: 11px;
+            margin-bottom: 5px;
+        }
+
+        .control-group input[type="range"] {
+            width: 100%;
+            margin-bottom: 5px;
+        }
+
+        .control-group input[type="checkbox"] {
+            margin-right: 8px;
+        }
+
+        .toggle-btn {
+            position: absolute;
+            right: -30px;
+            top: 10px;
+            background: rgba(0, 255, 170, 0.8);
+            border: none;
+            color: #000;
+            width: 25px;
+            height: 25px;
+            border-radius: 0 5px 5px 0;
+            cursor: pointer;
+            font-size: 12px;
+        }
+
+        /* Neuron Info Panel */
+        #neuron-info {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            background: rgba(20, 0, 40, 0.9);
+            border: 1px solid #ff6600;
+            border-radius: 8px;
+            padding: 15px;
+            max-width: 250px;
+            backdrop-filter: blur(10px);
+            z-index: 100;
+            display: none;
+        }
+
+        #neuron-info.visible {
+            display: block;
+        }
+
+        .neuron-title {
+            color: #ff6600;
+            font-size: 12px;
+            font-weight: bold;
+            margin-bottom: 10px;
+        }
+
+        .neuron-detail {
+            font-size: 10px;
+            color: #cccccc;
+            margin-bottom: 5px;
+        }
+
+        /* Neural Network Stats */
+        #network-stats {
+            position: absolute;
+            bottom: 20px;
+            left: 20px;
+            background: rgba(40, 0, 20, 0.9);
+            border: 1px solid #ff4488;
+            border-radius: 8px;
+            padding: 15px;
+            backdrop-filter: blur(10px);
+            z-index: 100;
+        }
+
+        .stats-title {
+            color: #ff4488;
+            font-size: 12px;
+            font-weight: bold;
+            margin-bottom: 8px;
+        }
+
+        .stat-line {
+            font-size: 10px;
+            color: #cccccc;
+            margin-bottom: 3px;
+        }
+
+        /* Loading Indicator */
+        #loading {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            color: #00ffaa;
+            font-size: 14px;
+            z-index: 200;
+        }
+
+        .loading-spinner {
+            border: 2px solid rgba(0, 255, 170, 0.3);
+            border-top: 2px solid #00ffaa;
+            border-radius: 50%;
+            width: 30px;
+            height: 30px;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 10px;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        /* Cosmic background overlay */
+        #cosmic-bg {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            opacity: 0.3;
+            z-index: -1;
+        }
+
+        /* Visualization Toggle Button */
+        #visualization-toggle-btn {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            background: rgba(0, 255, 170, 0.2);
+            border: 2px solid #00ffaa;
+            color: #00ffaa;
+            padding: 10px 15px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 14px;
+            z-index: 1000;
+            transition: all 0.3s ease;
+            backdrop-filter: blur(5px);
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            min-width: 160px;
+            justify-content: center;
+        }
+
+        #visualization-toggle-btn:hover {
+            background: rgba(0, 255, 170, 0.4);
+            transform: scale(1.05);
+            box-shadow: 0 4px 15px rgba(0, 255, 170, 0.3);
+        }
+
+        #toggle-icon {
+            font-size: 16px;
+        }
+
+        #toggle-text {
+            font-family: 'Courier New', monospace;
+            font-size: 12px;
+            font-weight: bold;
+        }
+
+        /* Responsive Design */
+        @media (max-width: 768px) {
+            #ui-panel {
+                max-width: 250px;
+                padding: 15px;
+            }
+            
+            #neuron-info {
+                max-width: 200px;
+                padding: 10px;
+            }
+        }
+    </style>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+</head>
+<body>
+    <div id="container">
+        <div id="canvas-container"></div>
+        <canvas id="cosmic-bg"></canvas>
+        
+        <!-- Loading Indicator -->
+        <div id="loading">
+            <div class="loading-spinner"></div>
+            Initializing Neural Network...
+        </div>
+
+        <!-- Visualization Toggle Button -->
+        <div id="visualization-toggle-btn" onclick="toggleVisualization()">
+            <span id="toggle-icon">🌌</span>
+            <span id="toggle-text">Cosmic Shader</span>
+        </div>
+
+        <!-- UI Control Panel -->
+        <div id="ui-panel">
+            <button class="toggle-btn" onclick="togglePanel()">◀</button>
+            <div class="panel-header">NEURAL CONTROLS</div>
+            
+            <div class="control-group">
+                <label>Network Scale</label>
+                <input type="range" id="networkScale" min="0.5" max="3.0" step="0.1" value="1.0" 
+                       onchange="updateNetworkScale(this.value)">
+                <span id="scaleValue">1.0</span>
+            </div>
+
+            <div class="control-group">
+                <label>Neuron Size</label>
+                <input type="range" id="neuronSize" min="0.5" max="3.0" step="0.1" value="1.0" 
+                       onchange="updateNeuronSize(this.value)">
+                <span id="neuronSizeValue">1.0</span>
+            </div>
+
+            <div class="control-group">
+                <label>Firing Rate</label>
+                <input type="range" id="firingRate" min="0.1" max="5.0" step="0.1" value="1.0" 
+                       onchange="updateFiringRate(this.value)">
+                <span id="firingRateValue">1.0</span>
+            </div>
+
+            <div class="control-group">
+                <label>Signal Speed</label>
+                <input type="range" id="signalSpeed" min="0.5" max="5.0" step="0.1" value="2.0" 
+                       onchange="updateSignalSpeed(this.value)">
+                <span id="signalSpeedValue">2.0</span>
+            </div>
+
+            <div class="control-group">
+                <label>Synapse Strength</label>
+                <input type="range" id="synapseStrength" min="0.1" max="2.0" step="0.1" value="1.0" 
+                       onchange="updateSynapseStrength(this.value)">
+                <span id="synapseStrengthValue">1.0</span>
+            </div>
+
+            <div class="control-group">
+                <input type="checkbox" id="showLabels" onchange="toggleLabels(this.checked)">
+                <label for="showLabels">Show Neuron IDs</label>
+            </div>
+
+            <div class="control-group">
+                <input type="checkbox" id="cosmicBg" checked onchange="toggleCosmicBg(this.checked)">
+                <label for="cosmicBg">Cosmic Background</label>
+            </div>
+
+            <div class="control-group">
+                <input type="checkbox" id="autoRotate" onchange="toggleAutoRotate(this.checked)">
+                <label for="autoRotate">Auto Rotate</label>
+            </div>
+
+            <div class="control-group">
+                <label>Neural Pattern</label>
+                <select id="neuralPattern" onchange="setNeuralPattern(this.value)">
+                    <option value="random">Random Network</option>
+                    <option value="layered">Layered (CNN-style)</option>
+                    <option value="circular">Circular Network</option>
+                    <option value="hierarchical">Hierarchical</option>
+                    <option value="brain">Brain-like</option>
+                </select>
+            </div>
+        </div>
+
+        <!-- Neuron Information Panel -->
+        <div id="neuron-info">
+            <div class="neuron-title">NEURON DETAILS</div>
+            <div class="neuron-detail">ID: <span id="neuronId">-</span></div>
+            <div class="neuron-detail">Type: <span id="neuronType">-</span></div>
+            <div class="neuron-detail">Activity: <span id="neuronActivity">-</span></div>
+            <div class="neuron-detail">Threshold: <span id="neuronThreshold">-</span></div>
+            <div class="neuron-detail">Connections: <span id="neuronConnections">-</span></div>
+            <div class="neuron-detail">Firing Rate: <span id="neuronFiringRate">-</span></div>
+            <div class="neuron-detail">Last Fired: <span id="neuronLastFired">-</span></div>
+        </div>
+
+        <!-- Network Statistics -->
+        <div id="network-stats">
+            <div class="stats-title">NEURAL NETWORK STATUS</div>
+            <div class="stat-line">Total Neurons: <span id="totalNeurons">0</span></div>
+            <div class="stat-line">Active Synapses: <span id="totalSynapses">0</span></div>
+            <div class="stat-line">Signals in Transit: <span id="activeSignals">0</span></div>
+            <div class="stat-line">Firing Rate: <span id="networkFiringRate">0 Hz</span></div>
+            <div class="stat-line">Network Activity: <span id="networkActivity">0%</span></div>
+            <div class="stat-line">Avg Response Time: <span id="avgResponseTime">0ms</span></div>
+        </div>
+    </div>
+
+    <script>
+        // Global application state
+        let scene, camera, renderer, cosmicScene, cosmicCamera, cosmicRenderer;
+        let neurons = [], synapses = [], electricalSignals = [];
+        let neuronMesh, synapseMesh, signalGroup, labelGroup;
+        let clock, frameCount = 0, lastFPS = Date.now();
+        let selectedNeuron = null;
+        let networkScale = 1.0, neuronSize = 1.0, firingRate = 1.0, signalSpeed = 2.0, synapseStrength = 1.0;
+        let showLabels = false, cosmicBg = true, autoRotate = false;
+        let raycaster, mouse;
+
+        // Shader materials
+        let neuronMaterial, synapseMaterial, cosmicMaterial;
+
+        // Neural network parameters
+        let neuralPattern = 'random';
+        let lastFiringTime = 0;
+        let totalFirings = 0;
+
+        // Cosmic shader app for background
+        let cosmicApp;
+
+        // Neural network classes
+        class Neuron {
+            constructor(id, type = 'excitatory') {
+                this.id = id;
+                this.type = type; // 'excitatory', 'inhibitory', 'sensory', 'motor'
+                this.position = new THREE.Vector3();
+                this.activity = 0.0; // Current electrical activity (0-1)
+                this.threshold = 0.3 + Math.random() * 0.4; // Firing threshold
+                this.potential = 0.0; // Membrane potential
+                this.lastFired = 0;
+                this.connections = [];
+                this.firingHistory = [];
+                this.refractoryPeriod = 50; // ms
+                this.size = 1.0 + Math.random() * 0.5;
+                this.baseColor = this.getColorByType();
+            }
+
+            getColorByType() {
+                switch(this.type) {
+                    case 'excitatory': return new THREE.Color(0.2, 1.0, 0.4); // Green
+                    case 'inhibitory': return new THREE.Color(1.0, 0.2, 0.2); // Red
+                    case 'sensory': return new THREE.Color(0.2, 0.4, 1.0); // Blue
+                    case 'motor': return new THREE.Color(1.0, 0.8, 0.2); // Yellow
+                    default: return new THREE.Color(0.8, 0.8, 0.8); // White
+                }
+            }
+
+            update(deltaTime, currentTime) {
+                // Decay potential over time
+                this.potential *= 0.95;
+                this.activity *= 0.98;
+
+                // Check if neuron should fire
+                if (this.potential > this.threshold && 
+                    currentTime - this.lastFired > this.refractoryPeriod) {
+                    this.fire(currentTime);
+                }
+
+                // Random spontaneous activity
+                if (Math.random() < 0.001 * firingRate) {
+                    this.potential += 0.1;
+                }
+            }
+
+            fire(currentTime) {
+                this.lastFired = currentTime;
+                this.activity = 1.0;
+                this.potential = 0.0; // Reset after firing
+                this.firingHistory.push(currentTime);
+                totalFirings++;
+
+                // Create electrical signals to connected neurons
+                for (let synapse of this.connections) {
+                    this.createElectricalSignal(synapse, currentTime);
+                }
+            }
+
+            createElectricalSignal(synapse, currentTime) {
+                const signal = new ElectricalSignal(
+                    this.position.clone(),
+                    synapse.target.position.clone(),
+                    synapse,
+                    currentTime
+                );
+                electricalSignals.push(signal);
+            }
+
+            receivePotential(amount) {
+                this.potential += amount;
+                this.activity = Math.max(this.activity, amount);
+            }
+        }
+
+        class Synapse {
+            constructor(source, target, weight = 1.0) {
+                this.source = source;
+                this.target = target;
+                this.weight = weight * synapseStrength;
+                this.strength = Math.random() * 0.5 + 0.5; // Synaptic strength
+                this.delay = Math.random() * 20 + 5; // Transmission delay (ms)
+                this.activity = 0.0;
+                this.plasticity = Math.random() * 0.1; // Learning rate
+            }
+
+            updateActivity(deltaTime) {
+                this.activity *= 0.95; // Decay activity
+            }
+
+            transmit(signal) {
+                // Calculate transmission strength based on synapse properties
+                const transmissionStrength = this.weight * this.strength;
+                
+                // Apply to target neuron
+                if (this.source.type === 'inhibitory') {
+                    this.target.receivePotential(-transmissionStrength * 0.3);
+                } else {
+                    this.target.receivePotential(transmissionStrength * 0.2);
+                }
+
+                this.activity = 1.0;
+
+                // Synaptic plasticity - strengthen frequently used connections
+                this.strength = Math.min(1.0, this.strength + this.plasticity * 0.01);
+            }
+        }
+
+        class ElectricalSignal {
+            constructor(startPos, endPos, synapse, startTime) {
+                this.startPos = startPos.clone();
+                this.endPos = endPos.clone();
+                this.currentPos = startPos.clone();
+                this.synapse = synapse;
+                this.startTime = startTime;
+                this.progress = 0.0;
+                this.speed = signalSpeed * (0.8 + Math.random() * 0.4); // Vary speed slightly
+                this.intensity = 1.0;
+                this.completed = false;
+                
+                // Visual properties
+                this.color = synapse.source.baseColor.clone();
+                this.trailLength = 0.1; // Length of the electrical trail
+            }
+
+            update(currentTime, deltaTime) {
+                if (this.completed) return;
+
+                const elapsed = currentTime - this.startTime;
+                const distance = this.startPos.distanceTo(this.endPos);
+                const travelTime = (distance / this.speed) * 100; // Scale for visual effect
+
+                this.progress = Math.min(1.0, elapsed / travelTime);
+                
+                // Update position along the synapse
+                this.currentPos.lerpVectors(this.startPos, this.endPos, this.progress);
+                
+                // Update intensity (fade as it travels)
+                this.intensity = 1.0 - (this.progress * 0.3);
+
+                // Check if signal reached target
+                if (this.progress >= 1.0) {
+                    this.synapse.transmit(this);
+                    this.completed = true;
+                }
+            }
+        }
+
+        // Initialize the visualization
+        function init() {
+            console.log('Initializing Neural Network Visualization...');
+
+            // Initialize cosmic background
+            initCosmicBackground();
+
+            // Scene setup
+            scene = new THREE.Scene();
+            camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+            camera.position.set(30, 30, 30);
+
+            // Renderer setup
+            renderer = new THREE.WebGLRenderer({ 
+                antialias: true, 
+                alpha: true,
+                powerPreference: "high-performance"
+            });
+            renderer.setSize(window.innerWidth, window.innerHeight);
+            renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+            renderer.setClearColor(0x000000, 0); // Transparent background
+            document.getElementById('canvas-container').appendChild(renderer.domElement);
+
+            // Controls setup
+            setupControls();
+
+            // Initialize utilities
+            clock = new THREE.Clock();
+            raycaster = new THREE.Raycaster();
+            mouse = new THREE.Vector2();
+
+            // Create neural network
+            generateNeuralNetwork();
+
+            // Create shaders and 3D objects
+            createShaders();
+            createNeurons();
+            createSynapses();
+            createSignalSystem();
+            createLabels();
+
+            // Lighting
+            setupLighting();
+
+            // Event listeners
+            setupEventListeners();
+
+            // Hide loading indicator
+            document.getElementById('loading').style.display = 'none';
+
+            console.log('Neural Network Visualization Initialized Successfully');
+        }
+
+        function initCosmicBackground() {
+            // Create cosmic background using simplified cosmic shader
+            const bgCanvas = document.getElementById('cosmic-bg');
+            bgCanvas.width = window.innerWidth;
+            bgCanvas.height = window.innerHeight;
+            
+            cosmicScene = new THREE.Scene();
+            cosmicCamera = new THREE.OrthographicCamera(-1, 1, 1, -1, -1, 1);
+            cosmicRenderer = new THREE.WebGLRenderer({ canvas: bgCanvas, alpha: true });
+            cosmicRenderer.setSize(window.innerWidth, window.innerHeight);
+
+            // Cosmic shader material (simplified version)
+            cosmicMaterial = new THREE.ShaderMaterial({
+                uniforms: {
+                    time: { value: 0.0 },
+                    resolution: { value: new THREE.Vector2(window.innerWidth, window.innerHeight) },
+                    intensity: { value: 0.3 }
+                },
+                vertexShader: `
+                    void main() {
+                        gl_Position = vec4(position, 1.0);
+                    }
+                `,
+                fragmentShader: `
+                    uniform float time;
+                    uniform vec2 resolution;
+                    uniform float intensity;
+                    
+                    void main() {
+                        vec2 uv = gl_FragCoord.xy / resolution.y;
+                        uv = 0.2 * (uv + uv - resolution.xy) / resolution.y;
+                        
+                        vec3 color = vec3(0.0);
+                        
+                        for (float i = 0.0; i < 8.0; i++) {
+                            float t = time * 0.5 + i * 0.1;
+                            vec2 p = uv + vec2(sin(t), cos(t * 0.7)) * 0.1;
+                            float d = length(p);
+                            color += vec3(0.1, 0.2, 0.4) / (d * 20.0 + 1.0);
+                        }
+                        
+                        gl_FragColor = vec4(color * intensity, 1.0);
+                    }
+                `,
+                transparent: true
+            });
+
+            const bgGeometry = new THREE.PlaneGeometry(2, 2);
+            const bgMesh = new THREE.Mesh(bgGeometry, cosmicMaterial);
+            cosmicScene.add(bgMesh);
+        }
+
+        function generateNeuralNetwork() {
+            console.log('Generating neural network...');
+            
+            neurons = [];
+            synapses = [];
+            electricalSignals = [];
+
+            const neuronCount = 80;
+            
+            // Generate neurons based on selected pattern
+            switch(neuralPattern) {
+                case 'layered':
+                    generateLayeredNetwork(neuronCount);
+                    break;
+                case 'circular':
+                    generateCircularNetwork(neuronCount);
+                    break;
+                case 'hierarchical':
+                    generateHierarchicalNetwork(neuronCount);
+                    break;
+                case 'brain':
+                    generateBrainLikeNetwork(neuronCount);
+                    break;
+                default:
+                    generateRandomNetwork(neuronCount);
+            }
+
+            // Create synaptic connections
+            createSynapticConnections();
+            
+            updateNetworkStats();
+            console.log(`Generated ${neurons.length} neurons and ${synapses.length} synapses`);
+        }
+
+        function generateRandomNetwork(count) {
+            for (let i = 0; i < count; i++) {
+                const type = Math.random() < 0.8 ? 'excitatory' : 'inhibitory';
+                const neuron = new Neuron(`n_${i}`, type);
+                neuron.position.set(
+                    (Math.random() - 0.5) * 40,
+                    (Math.random() - 0.5) * 40,
+                    (Math.random() - 0.5) * 40
+                );
+                neurons.push(neuron);
+            }
+        }
+
+        function generateLayeredNetwork(count) {
+            const layers = 5;
+            const neuronsPerLayer = Math.floor(count / layers);
+            
+            for (let layer = 0; layer < layers; layer++) {
+                for (let i = 0; i < neuronsPerLayer; i++) {
+                    const type = layer === 0 ? 'sensory' : 
+                                layer === layers - 1 ? 'motor' :
+                                Math.random() < 0.8 ? 'excitatory' : 'inhibitory';
+                    
+                    const neuron = new Neuron(`L${layer}_${i}`, type);
+                    neuron.position.set(
+                        (i - neuronsPerLayer/2) * 3,
+                        (layer - layers/2) * 8,
+                        (Math.random() - 0.5) * 10
+                    );
+                    neurons.push(neuron);
+                }
+            }
+        }
+
+        function generateCircularNetwork(count) {
+            const radius = 20;
+            for (let i = 0; i < count; i++) {
+                const angle = (i / count) * Math.PI * 2;
+                const type = Math.random() < 0.8 ? 'excitatory' : 'inhibitory';
+                const neuron = new Neuron(`c_${i}`, type);
+                
+                neuron.position.set(
+                    Math.cos(angle) * radius,
+                    Math.sin(angle) * radius,
+                    (Math.random() - 0.5) * 10
+                );
+                neurons.push(neuron);
+            }
+        }
+
+        function generateHierarchicalNetwork(count) {
+            // Create a tree-like structure
+            const levels = 4;
+            let neuronIndex = 0;
+            
+            for (let level = 0; level < levels; level++) {
+                const neuronsInLevel = Math.pow(2, level + 1);
+                const radius = (levels - level) * 5;
+                
+                for (let i = 0; i < neuronsInLevel && neuronIndex < count; i++) {
+                    const angle = (i / neuronsInLevel) * Math.PI * 2;
+                    const type = level === 0 ? 'sensory' : 'excitatory';
+                    const neuron = new Neuron(`h_${level}_${i}`, type);
+                    
+                    neuron.position.set(
+                        Math.cos(angle) * radius,
+                        level * 10 - 15,
+                        Math.sin(angle) * radius
+                    );
+                    neurons.push(neuron);
+                    neuronIndex++;
+                }
+            }
+        }
+
+        function generateBrainLikeNetwork(count) {
+            // Create regions similar to brain areas
+            const regions = [
+                { name: 'visual', center: [-15, 0, 0], size: 15, type: 'sensory' },
+                { name: 'motor', center: [15, 0, 0], size: 12, type: 'motor' },
+                { name: 'frontal', center: [0, 15, 0], size: 18, type: 'excitatory' },
+                { name: 'temporal', center: [0, -15, 0], size: 12, type: 'excitatory' }
+            ];
+
+            let neuronIndex = 0;
+            for (let region of regions) {
+                const neuronsInRegion = Math.floor(count / regions.length);
+                
+                for (let i = 0; i < neuronsInRegion && neuronIndex < count; i++) {
+                    const neuron = new Neuron(`${region.name}_${i}`, region.type);
+                    
+                    // Position neurons in a spherical region
+                    const phi = Math.random() * Math.PI * 2;
+                    const theta = Math.random() * Math.PI;
+                    const r = Math.random() * region.size;
+                    
+                    neuron.position.set(
+                        region.center[0] + r * Math.sin(theta) * Math.cos(phi),
+                        region.center[1] + r * Math.sin(theta) * Math.sin(phi),
+                        region.center[2] + r * Math.cos(theta)
+                    );
+                    neurons.push(neuron);
+                    neuronIndex++;
+                }
+            }
+        }
+
+        function createSynapticConnections() {
+            synapses = [];
+            
+            for (let neuron of neurons) {
+                // Each neuron connects to 3-8 other neurons
+                const connectionCount = Math.floor(Math.random() * 6) + 3;
+                const possibleTargets = neurons.filter(n => n !== neuron);
+                
+                for (let i = 0; i < connectionCount && i < possibleTargets.length; i++) {
+                    // Prefer closer neurons for connections
+                    const weights = possibleTargets.map(target => {
+                        const distance = neuron.position.distanceTo(target.position);
+                        return 1.0 / (distance + 1.0); // Closer = higher weight
+                    });
+                    
+                    const target = weightedRandomChoice(possibleTargets, weights);
+                    if (target && !neuron.connections.find(s => s.target === target)) {
+                        const synapse = new Synapse(neuron, target);
+                        neuron.connections.push(synapse);
+                        synapses.push(synapse);
+                    }
+                }
+            }
+        }
+
+        function weightedRandomChoice(items, weights) {
+            const totalWeight = weights.reduce((sum, weight) => sum + weight, 0);
+            let random = Math.random() * totalWeight;
+            
+            for (let i = 0; i < items.length; i++) {
+                random -= weights[i];
+                if (random <= 0) {
+                    return items[i];
+                }
+            }
+            return items[items.length - 1];
+        }
+
+        function createShaders() {
+            // Neuron vertex shader with electrical activity
+            const neuronVertexShader = `
+                attribute float size;
+                attribute float activity;
+                attribute float potential;
+                attribute vec3 neuronType;
+                
+                varying float vActivity;
+                varying float vPotential;
+                varying vec3 vNeuronType;
+                varying vec3 vPosition;
+                
+                uniform float time;
+                uniform float neuronScale;
+                
+                void main() {
+                    vActivity = activity;
+                    vPotential = potential;
+                    vNeuronType = neuronType;
+                    vPosition = position;
+                    
+                    // Electrical pulsing effect
+                    float electricPulse = 1.0 + 0.5 * sin(time * 8.0 + activity * 20.0) * activity;
+                    
+                    // Size based on activity and potential
+                    float finalSize = size * neuronScale * (1.0 + activity * 0.5) * electricPulse;
+                    
+                    vec4 mvPosition = modelViewMatrix * vec4(position, 1.0);
+                    gl_PointSize = finalSize * (300.0 / -mvPosition.z);
+                    gl_Position = projectionMatrix * mvPosition;
+                }
+            `;
+
+            // Neuron fragment shader with electrical glow
+            const neuronFragmentShader = `
+                varying float vActivity;
+                varying float vPotential;
+                varying vec3 vNeuronType;
+                varying vec3 vPosition;
+                
+                uniform float time;
+                
+                void main() {
+                    vec2 center = gl_PointCoord - 0.5;
+                    float distance = length(center);
+                    
+                    if (distance > 0.5) discard;
+                    
+                    // Base color by neuron type
+                    vec3 baseColor;
+                    if (vNeuronType.x > 0.5) {
+                        baseColor = vec3(0.2, 1.0, 0.4); // Excitatory - green
+                    } else if (vNeuronType.y > 0.5) {
+                        baseColor = vec3(1.0, 0.2, 0.2); // Inhibitory - red
+                    } else if (vNeuronType.z > 0.5) {
+                        baseColor = vec3(0.2, 0.4, 1.0); // Sensory - blue
+                    } else {
+                        baseColor = vec3(1.0, 0.8, 0.2); // Motor - yellow
+                    }
+                    
+                    // Electrical activity creates bright center
+                    float electricCore = 1.0 - distance * 3.0;
+                    electricCore = pow(max(0.0, electricCore), 2.0);
+                    
+                    // Outer glow based on activity
+                    float outerGlow = 1.0 - distance * 1.5;
+                    outerGlow = pow(max(0.0, outerGlow), 1.5);
+                    
+                    // Electrical sparking effect
+                    float spark = sin(time * 15.0 + vActivity * 25.0) * vActivity;
+                    spark = max(0.0, spark);
+                    
+                    // Membrane potential visualization
+                    float membrane = sin(distance * 20.0 - time * 5.0) * vPotential * 0.3;
+                    
+                    vec3 finalColor = baseColor * (0.3 + vActivity * 0.7);
+                    finalColor += vec3(1.0, 1.0, 0.8) * electricCore * vActivity;
+                    finalColor += vec3(0.8, 0.9, 1.0) * spark * 0.5;
+                    finalColor += baseColor * membrane;
+                    
+                    float alpha = outerGlow * (0.8 + vActivity * 0.2);
+                    
+                    gl_FragColor = vec4(finalColor, alpha);
+                }
+            `;
+
+            // Synapse/electrical signal shader
+            const synapseVertexShader = `
+                attribute float activity;
+                attribute float strength;
+                attribute vec3 signalPos;
+                
+                varying float vActivity;
+                varying float vStrength;
+                varying vec3 vSignalPos;
+                varying vec3 vPosition;
+                
+                uniform float time;
+                
+                void main() {
+                    vActivity = activity;
+                    vStrength = strength;
+                    vSignalPos = signalPos;
+                    vPosition = position;
+                    
+                    gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+                }
+            `;
+
+            const synapseFragmentShader = `
+                varying float vActivity;
+                varying float vStrength;
+                varying vec3 vSignalPos;
+                varying vec3 vPosition;
+                
+                uniform float time;
+                
+                void main() {
+                    // Distance from current position to signal position
+                    float signalDistance = distance(vPosition, vSignalPos);
+                    
+                    // Create electrical flow visualization
+                    float electricFlow = 1.0 / (signalDistance * 10.0 + 1.0);
+                    electricFlow *= vActivity;
+                    
+                    // Base synapse color (dim)
+                    vec3 baseColor = vec3(0.3, 0.3, 0.6) * vStrength;
+                    
+                    // Electrical signal color (bright)
+                    vec3 signalColor = vec3(0.8, 1.0, 1.0) * electricFlow;
+                    
+                    // Pulsing effect along the synapse
+                    float pulse = sin(time * 10.0 + vPosition.x * 0.1) * 0.5 + 0.5;
+                    pulse *= vActivity;
+                    
+                    vec3 finalColor = baseColor + signalColor + vec3(0.5, 0.8, 1.0) * pulse * 0.3;
+                    float alpha = 0.4 + vActivity * 0.6;
+                    
+                    gl_FragColor = vec4(finalColor, alpha);
+                }
+            `;
+
+            // Create materials
+            neuronMaterial = new THREE.ShaderMaterial({
+                vertexShader: neuronVertexShader,
+                fragmentShader: neuronFragmentShader,
+                uniforms: {
+                    time: { value: 0.0 },
+                    neuronScale: { value: neuronSize }
+                },
+                transparent: true,
+                blending: THREE.AdditiveBlending,
+                depthWrite: false
+            });
+
+            synapseMaterial = new THREE.ShaderMaterial({
+                vertexShader: synapseVertexShader,
+                fragmentShader: synapseFragmentShader,
+                uniforms: {
+                    time: { value: 0.0 }
+                },
+                transparent: true,
+                blending: THREE.AdditiveBlending,
+                depthWrite: false
+            });
+        }
+
+        function createNeurons() {
+            const geometry = new THREE.BufferGeometry();
+            const positions = new Float32Array(neurons.length * 3);
+            const sizes = new Float32Array(neurons.length);
+            const activities = new Float32Array(neurons.length);
+            const potentials = new Float32Array(neurons.length);
+            const neuronTypes = new Float32Array(neurons.length * 3);
+
+            for (let i = 0; i < neurons.length; i++) {
+                const neuron = neurons[i];
+                const i3 = i * 3;
+                
+                positions[i3] = neuron.position.x;
+                positions[i3 + 1] = neuron.position.y;
+                positions[i3 + 2] = neuron.position.z;
+                
+                sizes[i] = neuron.size * 8;
+                activities[i] = neuron.activity;
+                potentials[i] = neuron.potential;
+                
+                // Encode neuron type as vec3
+                neuronTypes[i3] = neuron.type === 'excitatory' ? 1 : 0;
+                neuronTypes[i3 + 1] = neuron.type === 'inhibitory' ? 1 : 0;
+                neuronTypes[i3 + 2] = neuron.type === 'sensory' ? 1 : 0;
+                // Motor neurons use the 'w' component or a combination
+            }
+
+            geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+            geometry.setAttribute('size', new THREE.BufferAttribute(sizes, 1));
+            geometry.setAttribute('activity', new THREE.BufferAttribute(activities, 1));
+            geometry.setAttribute('potential', new THREE.BufferAttribute(potentials, 1));
+            geometry.setAttribute('neuronType', new THREE.BufferAttribute(neuronTypes, 3));
+
+            neuronMesh = new THREE.Points(geometry, neuronMaterial);
+            scene.add(neuronMesh);
+        }
+
+        function createSynapses() {
+            const geometry = new THREE.BufferGeometry();
+            const positions = new Float32Array(synapses.length * 6); // 2 vertices per synapse
+            const activities = new Float32Array(synapses.length * 2);
+            const strengths = new Float32Array(synapses.length * 2);
+            const signalPositions = new Float32Array(synapses.length * 6);
+
+            for (let i = 0; i < synapses.length; i++) {
+                const synapse = synapses[i];
+                const i6 = i * 6;
+                const i2 = i * 2;
+                
+                positions[i6] = synapse.source.position.x;
+                positions[i6 + 1] = synapse.source.position.y;
+                positions[i6 + 2] = synapse.source.position.z;
+                positions[i6 + 3] = synapse.target.position.x;
+                positions[i6 + 4] = synapse.target.position.y;
+                positions[i6 + 5] = synapse.target.position.z;
+                
+                activities[i2] = synapse.activity;
+                activities[i2 + 1] = synapse.activity;
+                strengths[i2] = synapse.strength;
+                strengths[i2 + 1] = synapse.strength;
+                
+                // Initialize signal positions (will be updated during animation)
+                signalPositions[i6] = synapse.source.position.x;
+                signalPositions[i6 + 1] = synapse.source.position.y;
+                signalPositions[i6 + 2] = synapse.source.position.z;
+                signalPositions[i6 + 3] = synapse.source.position.x;
+                signalPositions[i6 + 4] = synapse.source.position.y;
+                signalPositions[i6 + 5] = synapse.source.position.z;
+            }
+
+            geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+            geometry.setAttribute('activity', new THREE.BufferAttribute(activities, 1));
+            geometry.setAttribute('strength', new THREE.BufferAttribute(strengths, 1));
+            geometry.setAttribute('signalPos', new THREE.BufferAttribute(signalPositions, 3));
+
+            synapseMesh = new THREE.LineSegments(geometry, synapseMaterial);
+            scene.add(synapseMesh);
+        }
+
+        function createSignalSystem() {
+            signalGroup = new THREE.Group();
+            scene.add(signalGroup);
+        }
+
+        function createLabels() {
+            if (!showLabels) return;
+            
+            labelGroup = new THREE.Group();
+            
+            for (let i = 0; i < neurons.length; i++) {
+                const neuron = neurons[i];
+                
+                // Create text sprite
+                const canvas = document.createElement('canvas');
+                const context = canvas.getContext('2d');
+                canvas.width = 128;
+                canvas.height = 32;
+                
+                context.fillStyle = '#ffffff';
+                context.font = '10px Courier New';
+                context.fillText(neuron.id, 4, 20);
+                
+                const texture = new THREE.CanvasTexture(canvas);
+                const material = new THREE.SpriteMaterial({ 
+                    map: texture,
+                    transparent: true,
+                    opacity: 0.8
+                });
+                
+                const sprite = new THREE.Sprite(material);
+                sprite.position.copy(neuron.position);
+                sprite.position.y += 4;
+                sprite.scale.set(6, 1.5, 1);
+                
+                labelGroup.add(sprite);
+            }
+            
+            scene.add(labelGroup);
+        }
+
+        function setupControls() {
+            // Simplified orbit controls
+            let isMouseDown = false;
+            let mouseX = 0, mouseY = 0;
+            let targetRotationX = 0, targetRotationY = 0;
+            let rotationX = 0, rotationY = 0;
+
+            renderer.domElement.addEventListener('mousedown', (event) => {
+                isMouseDown = true;
+                mouseX = event.clientX;
+                mouseY = event.clientY;
+            });
+
+            renderer.domElement.addEventListener('mouseup', () => {
+                isMouseDown = false;
+            });
+
+            renderer.domElement.addEventListener('mousemove', (event) => {
+                if (isMouseDown) {
+                    const deltaX = event.clientX - mouseX;
+                    const deltaY = event.clientY - mouseY;
+                    
+                    targetRotationX += deltaX * 0.01;
+                    targetRotationY += deltaY * 0.01;
+                    
+                    mouseX = event.clientX;
+                    mouseY = event.clientY;
+                } else {
+                    // Update mouse for raycasting
+                    mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
+                    mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
+                }
+            });
+
+            renderer.domElement.addEventListener('wheel', (event) => {
+                camera.position.multiplyScalar(event.deltaY > 0 ? 1.1 : 0.9);
+                camera.position.clampLength(10, 200);
+            });
+
+            // Update camera rotation
+            function updateControls() {
+                rotationX += (targetRotationX - rotationX) * 0.05;
+                rotationY += (targetRotationY - rotationY) * 0.05;
+                
+                if (autoRotate) {
+                    rotationX += 0.003;
+                }
+                
+                const radius = camera.position.length();
+                camera.position.x = radius * Math.sin(rotationX) * Math.cos(rotationY);
+                camera.position.y = radius * Math.sin(rotationY);
+                camera.position.z = radius * Math.cos(rotationX) * Math.cos(rotationY);
+                camera.lookAt(0, 0, 0);
+                
+                requestAnimationFrame(updateControls);
+            }
+            updateControls();
+        }
+
+        function setupLighting() {
+            // Ambient light for general illumination
+            const ambientLight = new THREE.AmbientLight(0x404040, 0.4);
+            scene.add(ambientLight);
+
+            // Point lights for neural activity highlighting
+            const light1 = new THREE.PointLight(0x00ffaa, 0.6, 100);
+            light1.position.set(20, 20, 20);
+            scene.add(light1);
+
+            const light2 = new THREE.PointLight(0xff4488, 0.4, 80);
+            light2.position.set(-20, -20, -20);
+            scene.add(light2);
+
+            const light3 = new THREE.PointLight(0x4488ff, 0.5, 60);
+            light3.position.set(0, 0, 30);
+            scene.add(light3);
+        }
+
+        function setupEventListeners() {
+            window.addEventListener('resize', onWindowResize);
+            renderer.domElement.addEventListener('click', onMouseClick);
+        }
+
+        function onWindowResize() {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+            
+            if (cosmicRenderer) {
+                cosmicRenderer.setSize(window.innerWidth, window.innerHeight);
+                cosmicMaterial.uniforms.resolution.value.set(window.innerWidth, window.innerHeight);
+            }
+        }
+
+        function onMouseClick(event) {
+            raycaster.setFromCamera(mouse, camera);
+            const intersects = raycaster.intersectObject(neuronMesh);
+            
+            if (intersects.length > 0) {
+                const index = intersects[0].index;
+                selectNeuron(neurons[index]);
+            } else {
+                deselectNeuron();
+            }
+        }
+
+        function selectNeuron(neuron) {
+            selectedNeuron = neuron;
+            
+            // Update neuron info panel
+            document.getElementById('neuronId').textContent = neuron.id;
+            document.getElementById('neuronType').textContent = neuron.type.toUpperCase();
+            document.getElementById('neuronActivity').textContent = (neuron.activity * 100).toFixed(1) + '%';
+            document.getElementById('neuronThreshold').textContent = neuron.threshold.toFixed(3);
+            document.getElementById('neuronConnections').textContent = neuron.connections.length;
+            
+            const firingRate = neuron.firingHistory.length > 0 ? 
+                (neuron.firingHistory.length / (Date.now() - neuron.firingHistory[0]) * 1000).toFixed(1) : '0';
+            document.getElementById('neuronFiringRate').textContent = firingRate + ' Hz';
+            
+            const lastFired = neuron.lastFired > 0 ? 
+                ((Date.now() - neuron.lastFired) / 1000).toFixed(1) + 's ago' : 'Never';
+            document.getElementById('neuronLastFired').textContent = lastFired;
+            
+            document.getElementById('neuron-info').classList.add('visible');
+            
+            // Trigger firing for demonstration
+            neuron.potential = neuron.threshold + 0.1;
+        }
+
+        function deselectNeuron() {
+            selectedNeuron = null;
+            document.getElementById('neuron-info').classList.remove('visible');
+        }
+
+        function updateNeuralNetwork(deltaTime, currentTime) {
+            // Update neurons
+            for (let neuron of neurons) {
+                neuron.update(deltaTime, currentTime);
+            }
+            
+            // Update synapses
+            for (let synapse of synapses) {
+                synapse.updateActivity(deltaTime);
+            }
+            
+            // Update electrical signals
+            electricalSignals = electricalSignals.filter(signal => {
+                signal.update(currentTime, deltaTime);
+                return !signal.completed;
+            });
+            
+            // Update buffer attributes
+            updateNeuronAttributes();
+            updateSynapseAttributes();
+            updateNetworkStats();
+        }
+
+        function updateNeuronAttributes() {
+            const activities = neuronMesh.geometry.attributes.activity;
+            const potentials = neuronMesh.geometry.attributes.potential;
+            const sizes = neuronMesh.geometry.attributes.size;
+            
+            for (let i = 0; i < neurons.length; i++) {
+                const neuron = neurons[i];
+                activities.array[i] = neuron.activity;
+                potentials.array[i] = neuron.potential;
+                sizes.array[i] = neuron.size * 8 * neuronSize;
+            }
+            
+            activities.needsUpdate = true;
+            potentials.needsUpdate = true;
+            sizes.needsUpdate = true;
+        }
+
+        function updateSynapseAttributes() {
+            const activities = synapseMesh.geometry.attributes.activity;
+            const strengths = synapseMesh.geometry.attributes.strength;
+            const signalPositions = synapseMesh.geometry.attributes.signalPos;
+            
+            for (let i = 0; i < synapses.length; i++) {
+                const synapse = synapses[i];
+                const i2 = i * 2;
+                const i6 = i * 6;
+                
+                activities.array[i2] = synapse.activity;
+                activities.array[i2 + 1] = synapse.activity;
+                strengths.array[i2] = synapse.strength * synapseStrength;
+                strengths.array[i2 + 1] = synapse.strength * synapseStrength;
+                
+                // Find active signals for this synapse
+                const activeSignal = electricalSignals.find(signal => signal.synapse === synapse);
+                if (activeSignal) {
+                    signalPositions.array[i6] = activeSignal.currentPos.x;
+                    signalPositions.array[i6 + 1] = activeSignal.currentPos.y;
+                    signalPositions.array[i6 + 2] = activeSignal.currentPos.z;
+                    signalPositions.array[i6 + 3] = activeSignal.currentPos.x;
+                    signalPositions.array[i6 + 4] = activeSignal.currentPos.y;
+                    signalPositions.array[i6 + 5] = activeSignal.currentPos.z;
+                } else {
+                    // No active signal, use source position
+                    signalPositions.array[i6] = synapse.source.position.x;
+                    signalPositions.array[i6 + 1] = synapse.source.position.y;
+                    signalPositions.array[i6 + 2] = synapse.source.position.z;
+                    signalPositions.array[i6 + 3] = synapse.source.position.x;
+                    signalPositions.array[i6 + 4] = synapse.source.position.y;
+                    signalPositions.array[i6 + 5] = synapse.source.position.z;
+                }
+            }
+            
+            activities.needsUpdate = true;
+            strengths.needsUpdate = true;
+            signalPositions.needsUpdate = true;
+        }
+
+        function updateNetworkStats() {
+            const activeSignals = electricalSignals.length;
+            const currentTime = Date.now();
+            
+            // Calculate network firing rate (firings per second)
+            const recentFirings = neurons.reduce((count, neuron) => {
+                return count + neuron.firingHistory.filter(time => currentTime - time < 1000).length;
+            }, 0);
+            
+            // Calculate average network activity
+            const avgActivity = neurons.reduce((sum, neuron) => sum + neuron.activity, 0) / neurons.length;
+            
+            // Calculate average response time (simplified)
+            const avgResponseTime = electricalSignals.length > 0 ? 
+                electricalSignals.reduce((sum, signal) => sum + (currentTime - signal.startTime), 0) / electricalSignals.length : 0;
+            
+            document.getElementById('totalNeurons').textContent = neurons.length;
+            document.getElementById('totalSynapses').textContent = synapses.length;
+            document.getElementById('activeSignals').textContent = activeSignals;
+            document.getElementById('networkFiringRate').textContent = recentFirings + ' Hz';
+            document.getElementById('networkActivity').textContent = (avgActivity * 100).toFixed(1) + '%';
+            document.getElementById('avgResponseTime').textContent = avgResponseTime.toFixed(1) + 'ms';
+        }
+
+        function animate() {
+            requestAnimationFrame(animate);
+            
+            const currentTime = Date.now();
+            const deltaTime = clock.getDelta() * 1000; // Convert to milliseconds
+            const elapsedTime = clock.getElapsedTime();
+            
+            // Update cosmic background
+            if (cosmicBg && cosmicMaterial) {
+                cosmicMaterial.uniforms.time.value = elapsedTime * 0.5;
+                cosmicRenderer.render(cosmicScene, cosmicCamera);
+            }
+            
+            // Update neural network
+            updateNeuralNetwork(deltaTime, currentTime);
+            
+            // Update shader uniforms
+            if (neuronMaterial && neuronMaterial.uniforms) {
+                neuronMaterial.uniforms.time.value = elapsedTime;
+                neuronMaterial.uniforms.neuronScale.value = neuronSize * networkScale;
+            }
+            
+            if (synapseMaterial && synapseMaterial.uniforms) {
+                synapseMaterial.uniforms.time.value = elapsedTime;
+            }
+            
+            // Trigger random neural activity
+            if (Math.random() < 0.02 * firingRate) {
+                const randomNeuron = neurons[Math.floor(Math.random() * neurons.length)];
+                randomNeuron.potential = randomNeuron.threshold + 0.1;
+            }
+            
+            // Scale scene
+            scene.scale.setScalar(networkScale);
+            
+            // Render main scene
+            renderer.render(scene, camera);
+        }
+
+        // UI Control Functions
+        function togglePanel() {
+            const panel = document.getElementById('ui-panel');
+            const btn = panel.querySelector('.toggle-btn');
+            panel.classList.toggle('minimized');
+            btn.textContent = panel.classList.contains('minimized') ? '▶' : '◀';
+        }
+
+        function updateNetworkScale(value) {
+            networkScale = parseFloat(value);
+            document.getElementById('scaleValue').textContent = value;
+        }
+
+        function updateNeuronSize(value) {
+            neuronSize = parseFloat(value);
+            document.getElementById('neuronSizeValue').textContent = value;
+        }
+
+        function updateFiringRate(value) {
+            firingRate = parseFloat(value);
+            document.getElementById('firingRateValue').textContent = value;
+        }
+
+        function updateSignalSpeed(value) {
+            signalSpeed = parseFloat(value);
+            document.getElementById('signalSpeedValue').textContent = value;
+        }
+
+        function updateSynapseStrength(value) {
+            synapseStrength = parseFloat(value);
+            document.getElementById('synapseStrengthValue').textContent = value;
+        }
+
+        function toggleLabels(enabled) {
+            showLabels = enabled;
+            if (labelGroup) {
+                scene.remove(labelGroup);
+            }
+            if (enabled) {
+                createLabels();
+            }
+        }
+
+        function toggleCosmicBg(enabled) {
+            cosmicBg = enabled;
+            const bgCanvas = document.getElementById('cosmic-bg');
+            bgCanvas.style.display = enabled ? 'block' : 'none';
+        }
+
+        function toggleAutoRotate(enabled) {
+            autoRotate = enabled;
+        }
+
+        function setNeuralPattern(pattern) {
+            neuralPattern = pattern;
+            
+            // Remove existing geometry
+            if (neuronMesh) scene.remove(neuronMesh);
+            if (synapseMesh) scene.remove(synapseMesh);
+            if (labelGroup) scene.remove(labelGroup);
+            
+            // Regenerate network
+            generateNeuralNetwork();
+            createNeurons();
+            createSynapses();
+            if (showLabels) createLabels();
+        }
+
+        // Keyboard shortcuts
+        document.addEventListener('keydown', (event) => {
+            switch(event.code) {
+                case 'Space':
+                    event.preventDefault();
+                    toggleAutoRotate(!autoRotate);
+                    document.getElementById('autoRotate').checked = autoRotate;
+                    break;
+                case 'KeyL':
+                    toggleLabels(!showLabels);
+                    document.getElementById('showLabels').checked = showLabels;
+                    break;
+                case 'KeyB':
+                    toggleCosmicBg(!cosmicBg);
+                    document.getElementById('cosmicBg').checked = cosmicBg;
+                    break;
+                case 'KeyF':
+                    // Fire a random neuron
+                    const randomNeuron = neurons[Math.floor(Math.random() * neurons.length)];
+                    randomNeuron.potential = randomNeuron.threshold + 0.2;
+                    break;
+                case 'Escape':
+                    deselectNeuron();
+                    break;
+            }
+        });
+
+        // Initialize the application
+        window.addEventListener('load', () => {
+            console.log('Initializing Neural Network Visualization...');
+            
+            // Check for WebGL support
+            if (!window.WebGLRenderingContext) {
+                document.getElementById('loading').innerHTML = 
+                    '<div style="color: #ff4444;">WebGL not supported in this browser</div>';
+                return;
+            }
+            
+            try {
+                init();
+                animate();
+                
+                console.log('Neural Network Application initialized successfully');
+                
+                // Show usage tips
+                setTimeout(() => {
+                    console.log('Controls:');
+                    console.log('- Mouse: Orbit camera');
+                    console.log('- Scroll: Zoom');
+                    console.log('- Click: Select neuron');
+                    console.log('- Space: Toggle auto-rotate');
+                    console.log('- L: Toggle labels');
+                    console.log('- B: Toggle cosmic background');
+                    console.log('- F: Fire random neuron');
+                }, 2000);
+                
+            } catch (error) {
+                console.error('Initialization failed:', error);
+                document.getElementById('loading').innerHTML = 
+                    '<div style="color: #ff4444;">Initialization failed: ' + error.message + '</div>';
+            }
+        });
+
+        // Visualization toggle functionality
+        function toggleVisualization() {
+            const currentUrl = window.location.pathname;
+            
+            if (currentUrl.includes('decentralized-network-topology.html') || currentUrl.endsWith('decentralized-network-topology.html')) {
+                // Switch to cosmic shader
+                window.location.href = 'index.html';
+            } else {
+                // Switch to neural network
+                window.location.href = 'decentralized-network-topology.html';
+            }
+        }
+
+        // Make functions globally available
+        window.togglePanel = togglePanel;
+        window.updateNetworkScale = updateNetworkScale;
+        window.updateNeuronSize = updateNeuronSize;
+        window.updateFiringRate = updateFiringRate;
+        window.updateSignalSpeed = updateSignalSpeed;
+        window.updateSynapseStrength = updateSynapseStrength;
+        window.toggleLabels = toggleLabels;
+        window.toggleCosmicBg = toggleCosmicBg;
+        window.toggleAutoRotate = toggleAutoRotate;
+        window.setNeuralPattern = setNeuralPattern;
+        window.toggleVisualization = toggleVisualization;
+    </script>
+</body>
+</html>
